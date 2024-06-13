@@ -46,8 +46,10 @@ const getAudioFiles = (deviceName) => {
 // Define routes
 const authRoutes = require('./router/authRoutes');
 const phoneRoutes = require('./router/phoneRoutes');
+const aiSettingsRoutes = require('./router/aiSettingsRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/phone', phoneRoutes);
+app.use('/api/ai-settings', aiSettingsRoutes);
 
 app.get('/audio/:deviceName/:filename', (req, res) => {
   const { deviceName, filename } = req.params;

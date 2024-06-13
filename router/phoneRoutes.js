@@ -18,4 +18,7 @@ router.post('/deactivate', auth, deviceController.deactivateDevice);
 // @access Private
 router.get('/active-devices', auth, deviceController.getActiveDevices);
 
+// Link AI settings to a device
+router.post('/link-ai-settings', auth, deviceController.linkAISettingsToDevice);
+
 module.exports = router;

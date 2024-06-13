@@ -65,3 +65,24 @@ exports.getActiveDevices = async (req, res) => {
     res.status(500).send('Server error');
   }
 };
+
+exports.linkAISettingsToDevice = async (req, res) => {
+    const { deviceId, aiSettingId } = req.body;
+  
+    try {
+      const device = await Device.findById(deviceId);
+      const aiSetting = await AISettings.findById(aiSettingId);
+  
+      if (!device || !aiSetting) {
+        return res.status(404).json({ msg: 'Device or AI setting not found' });
+      }
+  
+      device.aiSetting = aiSetting._id;
+      await device.save();
+  
+      res.json(device);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server error');
+    }
+  };
