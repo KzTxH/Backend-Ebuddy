@@ -4,6 +4,10 @@ exports.activateDevice = async (req, res) => {
   const { deviceName, tiktokUsername } = req.body;
 
   try {
+    if (!deviceName || !tiktokUsername) {
+      return res.status(400).json({ msg: 'Device name and TikTok username are required' });
+    }
+
     let device = await Device.findOne({ deviceName });
 
     if (!device) {
@@ -29,6 +33,10 @@ exports.deactivateDevice = async (req, res) => {
   const { deviceName } = req.body;
 
   try {
+    if (!deviceName) {
+      return res.status(400).json({ msg: 'Device name is required' });
+    }
+
     const device = await Device.findOne({ deviceName });
 
     if (!device) {

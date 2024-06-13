@@ -13,7 +13,7 @@ const DeviceSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: false,
-  }
+  },
 });
 
 module.exports = mongoose.model('Device', DeviceSchema);
