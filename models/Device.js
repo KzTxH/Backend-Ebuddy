@@ -1,19 +1,23 @@
+// models/Device.js
 const mongoose = require('mongoose');
 
 const DeviceSchema = new mongoose.Schema({
   deviceName: {
     type: String,
-    required: true,
-    unique: true,
+    required: true
   },
   tiktokUsername: {
     type: String,
-    required: true,
+    required: true
   },
   isActive: {
     type: Boolean,
-    default: false,
+    default: true
   },
+  aiSetting: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AISetting'
+  }
 });
 
 module.exports = mongoose.model('Device', DeviceSchema);

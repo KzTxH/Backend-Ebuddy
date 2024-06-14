@@ -1,33 +1,23 @@
-const AISettings = require('../models/AISettings');
+const AISetting = require('../models/AISetting');
 
+// Save AI settings
 exports.saveSettings = async (req, res) => {
-  const { productName, settings } = req.body;
-
-  if (!productName) {
-    return res.status(400).json({ msg: 'Tên Sản Phẩm là bắt buộc' });
-  }
+  const { productName, description } = req.body;
 
   try {
-    const newSettings = new AISettings({
-      productName,
-      settings,
-    });
-
-    await newSettings.save();
-
-    // Emit event for real-time updates
-    req.app.get('socketio').emit('updateAISettings');
-
-    res.json(newSettings);
+    const newSetting = new AISetting({ productName, description });
+    const setting = await newSetting.save();
+    res.json(setting);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
   }
 };
 
+// Get all AI settings
 exports.getAllSettings = async (req, res) => {
   try {
-    const settings = await AISettings.find();
+    const settings = await AISetting.find();
     res.json(settings);
   } catch (err) {
     console.error(err.message);
@@ -35,38 +25,40 @@ exports.getAllSettings = async (req, res) => {
   }
 };
 
+// Update AI settings
 exports.updateSettings = async (req, res) => {
-  const { productName, settings } = req.body;
-
-  if (!productName) {
-    return res.status(400).json({ msg: 'Tên Sản Phẩm là bắt buộc' });
-  }
+  const { productName, description } = req.body;
 
   try {
-    const updatedSettings = await AISettings.findByIdAndUpdate(
-      req.params.id,
-      { productName, settings },
-      { new: true }
-    );
+    let setting = await AISetting.findById(req.params.id);
 
-    // Emit event for real-time updates
-    req.app.get('socketio').emit('updateAISettings');
+    if (!setting) {
+      return res.status(404).json({ msg: 'AI setting not found' });
+    }
 
-    res.json(updatedSettings);
+    setting.productName = productName;
+    setting.description = description;
+    // Update other fields
+
+    setting = await setting.save();
+    res.json(setting);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
   }
 };
 
+// Delete AI settings
 exports.deleteSettings = async (req, res) => {
   try {
-    await AISettings.findByIdAndDelete(req.params.id);
+    let setting = await AISetting.findById(req.params.id);
 
-    // Emit event for real-time updates
-    req.app.get('socketio').emit('updateAISettings');
+    if (!setting) {
+      return res.status(404).json({ msg: 'AI setting not found' });
+    }
 
-    res.json({ msg: 'Cài Đặt AI đã được xóa' });
+    await AISetting.findByIdAndRemove(req.params.id);
+    res.json({ msg: 'AI setting removed' });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
