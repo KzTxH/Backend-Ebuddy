@@ -2,6 +2,10 @@ const Device = require('../models/Device');
 const AISetting = require('../models/AISetting');
 const fs = require('fs');
 const path = require('path');
+const chokidar = require('chokidar');
+const { connectToTikTokLive } = require('../services/tiktokliveAPI');
+
+const AUDIO_DIR = path.join(__dirname, '../public/audio_files');
 
 
 // Activate a device
@@ -20,16 +24,32 @@ exports.activateDevice = async (req, res) => {
       await device.save();
     }
 
-    // Create directory for device if it doesn't exist
-    const deviceDir = path.join(__dirname, '..', 'public', 'audio_files', deviceName);
+    const deviceDir = path.join(AUDIO_DIR, deviceName);
     if (!fs.existsSync(deviceDir)) {
-      fs.mkdirSync(deviceDir);
+      fs.mkdirSync(deviceDir, { recursive: true });
     }
 
     const activeDevices = await Device.find({ isActive: true });
-    req.app.get('socketio').emit('updateActiveDevices', activeDevices);
+    const io = req.app.get('socketio');
+    io.emit('updateActiveDevices', activeDevices);
 
     res.json(device);
+
+    // Watch for changes in the device's directory
+    // const deviceDir = path.join(AUDIO_DIR, deviceName);
+    console.log(deviceDir)
+    chokidar.watch(deviceDir).on('all', (event, filePath) => {
+      const newFile = path.basename(filePath);
+      if (event === 'add') {
+        io.emit('newAudioFile', { deviceName, newFile });
+      } else if (event === 'unlink') { // Handle file deletion
+        io.emit('deleteAudioFile', { deviceName, newFile });
+      }
+      // Emit updateAudioFiles for any change
+      const files = fs.readdirSync(deviceDir).filter(file => path.extname(file) === '.mp3');
+      io.emit('updateAudioFiles', { deviceName, files });
+    });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -50,14 +70,18 @@ exports.deactivateDevice = async (req, res) => {
     device.isActive = false;
     await device.save();
 
-    // Delete directory for device
-    const deviceDir = path.join(__dirname, '..', 'public', 'audio_files', deviceName);
-    if (fs.existsSync(deviceDir)) {
-      fs.rmdirSync(deviceDir, { recursive: true });
-    }
-
     const activeDevices = await Device.find({ isActive: true });
-    req.app.get('socketio').emit('updateActiveDevices', activeDevices);
+    const io = req.app.get('socketio');
+    io.emit('updateActiveDevices', activeDevices);
+
+    
+    const deviceDir = path.join(AUDIO_DIR, deviceName);
+    if (fs.existsSync(deviceDir)) {
+      fs.rmSync(deviceDir, { recursive: true, force: true });
+      console.log(`Directory ${deviceDir} has been removed`);
+    } else {
+      console.log(`Directory ${deviceDir} does not exist`);
+    }
 
     res.json(device);
   } catch (err) {
@@ -98,10 +122,17 @@ exports.linkAISettings = async (req, res) => {
 
     device.aiSetting = aiSettingId;
     await device.save();
+    try {
+      await connectToTikTokLive(device.tiktokUsername);
+    } catch (error) {
+      console.error('Error during TikTok live connection:', error);
+      throw new Error('TikTok live connection failed');
+    }
 
     const activeDevices = await Device.find({ isActive: true }).populate('aiSetting');
     req.app.get('socketio').emit('updateActiveDevices', activeDevices);
 
+    
     res.json(device);
   } catch (err) {
     console.error(err);

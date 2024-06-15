@@ -105,20 +105,6 @@ io.on('connection', (socket) => {
 
 });
 
-chokidar.watch(AUDIO_DIR).on('all', (event, filePath) => {
-  console.log(event, filePath);
-  if (!fs.existsSync(filePath)) {
-    return;
-  }
-  const relativePath = path.relative(AUDIO_DIR, filePath);
-  const deviceName = relativePath.split(path.sep)[0];
-  if (!deviceName || !fs.lstatSync(path.join(AUDIO_DIR, deviceName)).isDirectory()) {
-    console.error('Device name is undefined or is not a directory');
-    return;
-  }
-  const files = getAudioFiles(deviceName);
-  io.emit('updateAudioFiles', { deviceName, files });
-});
 
 const PORT = process.env.PORT || 3002;
 server.listen(PORT, () => {

@@ -16,6 +16,7 @@
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^5.13.8",
     "socket.io": "^4.7.5",
+    "tiktok-live-connector": "^1.1.7",
     "ws": "^8.17.0"
   },
   "author": "",
