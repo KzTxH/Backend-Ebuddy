@@ -76,6 +76,7 @@ const io = socketIo(server, {
 
 app.set('socketio', io);
 
+
 io.on('connection', (socket) => {
   console.log('Client connected');
 
@@ -91,6 +92,17 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('Socket disconnected');
   });
+
+  socket.on('keepAlive', () => {
+    io.emit('keepAlive2');
+    console.log('Received ping from client');
+  });
+
+  socket.on('error', (error) => {
+    console.error(`Client [id=${socket.id}] encountered error: ${error}`);
+  });
+
+
 });
 
 chokidar.watch(AUDIO_DIR).on('all', (event, filePath) => {
