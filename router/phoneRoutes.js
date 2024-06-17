@@ -23,4 +23,6 @@ router.get('/active-devices', auth, deviceController.getActiveDevices);
 // @access Private
 router.post('/link-ai-settings', auth, deviceController.linkAISettings);
 
+router.post('/voice-ai', auth, deviceController.voiceAI);
+
 module.exports = router;

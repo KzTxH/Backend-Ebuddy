@@ -8,6 +8,13 @@ const axios = require('axios');
 
 const AUDIO_DIR = path.join(__dirname, '../public/audio_files');
 
+// let tiktokLiveConnection = null;
+// let aiSetting = null;
+// let device = null;
+
+
+let tiktokLiveConnectionDatas = [];
+
 
 // Activate a device
 exports.activateDevice = async (req, res) => {
@@ -38,18 +45,18 @@ exports.activateDevice = async (req, res) => {
 
     // Watch for changes in the device's directory
     // const deviceDir = path.join(AUDIO_DIR, deviceName);
-    console.log(deviceDir)
-    chokidar.watch(deviceDir).on('all', (event, filePath) => {
-      const newFile = path.basename(filePath);
-      if (event === 'add') {
-        io.emit('newAudioFile', { deviceName, newFile });
-      } else if (event === 'unlink') { // Handle file deletion
-        io.emit('deleteAudioFile', { deviceName, newFile });
-      }
-      // Emit updateAudioFiles for any change
-      const files = fs.readdirSync(deviceDir).filter(file => path.extname(file) === '.mp3');
-      io.emit('updateAudioFiles', { deviceName, files });
-    });
+    // console.log(deviceDir)
+    // chokidar.watch(deviceDir).on('all', (event, filePath) => {
+    //   const newFile = path.basename(filePath);
+    //   if (event === 'add') {
+    //     io.emit('newAudioFile', { deviceName, newFile });
+    //   } else if (event === 'unlink') { // Handle file deletion
+    //     io.emit('deleteAudioFile', { deviceName, newFile });
+    //   }
+    //   // Emit updateAudioFiles for any change
+    //   const files = fs.readdirSync(deviceDir).filter(file => path.extname(file) === '.mp3');
+    //   io.emit('updateAudioFiles', { deviceName, files });
+    // });
 
   } catch (err) {
     console.error(err.message);
@@ -105,47 +112,39 @@ exports.getActiveDevices = async (req, res) => {
 // Link AI settings to a device
 exports.linkAISettings = async (req, res) => {
   const { deviceName, aiSettingId } = req.body;
+  const tiktokLiveConnectionData = {
+    tiktokLiveConnection: null,
+    aiSetting: null,
+    device: null
+  };
 
   try {
-    const device = await Device.findOne({ deviceName });
+    tiktokLiveConnectionData.device = await Device.findOne({ deviceName });
 
-    if (!device) {
+    if (!tiktokLiveConnectionData.device) {
       return res.status(404).json({ msg: 'Device not found' });
     }
 
-    const aiSetting = await AISetting.findById(aiSettingId);
+    tiktokLiveConnectionData.aiSetting = await AISetting.findById(aiSettingId);
 
-    if (!aiSetting) {
+    if (!tiktokLiveConnectionData.aiSetting) {
       return res.status(404).json({ msg: 'AI Setting not found' });
     }
 
-    device.aiSetting = aiSettingId;
-    await device.save();
+    tiktokLiveConnectionData.device.aiSetting = aiSettingId;
+    await tiktokLiveConnectionData.device.save();
 
     const io = req.app.get('socketio');
 
     try {
-      const tiktokLiveConnection = await connectToTikTokLive(device.tiktokUsername);
-      io.tiktokLiveConnections = io.tiktokLiveConnections || {};
-      io.tiktokLiveConnections[deviceName] = tiktokLiveConnection;
 
-      tiktokLiveConnection.on('member', async (data) => {
-        
-    
-const text = `${data.uniqueId} joins the stream!`;
-        const audioData = await generateAudio(text);
-        await saveAudioFile(deviceName, audioData);
-        io.emit('newAudioFile', { deviceName, newFile: audioData.fileName });
-      });
+      tiktokLiveConnectionData.tiktokLiveConnection = await connectToTikTokLive(tiktokLiveConnectionData.device.tiktokUsername);
 
-      tiktokLiveConnection.on('roomUser', async (data) => {
-        const text = `Total viewers: ${data.viewerCount}`;
-        const audioData = await generateAudio(text);
-        await saveAudioFile(deviceName, audioData);
-        io.emit('newAudioFile', { deviceName, newFile: audioData.fileName });
-      });
+      // tiktokLiveConnection = await connectToTikTokLive(device.tiktokUsername);
+      // io.tiktokLiveConnections = io.tiktokLiveConnections || {};
+      // io.tiktokLiveConnections[deviceName] = tiktokLiveConnection;
+      await handleStreaming(tiktokLiveConnectionData.tiktokLiveConnection, tiktokLiveConnectionData.aiSetting.description, tiktokLiveConnectionData.device.deviceName, io);
 
-      await handleStreaming(aiSetting.description, deviceName, io);
     } catch (error) {
       if (error.message.includes('TikTok user not found')) {
         console.error('TikTok user not found:', error);
@@ -155,7 +154,30 @@ const text = `${data.uniqueId} joins the stream!`;
       return res.status(500).json({ message: 'TikTok live connection failed' });
     }
 
+    tiktokLiveConnectionDatas.push(tiktokLiveConnectionData);
     res.json({ message: 'AI Settings linked successfully' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+};
+
+exports.voiceAI = async (req, res) => {
+  const { deviceName } = req.body;
+
+  const io = req.app.get('socketio');
+  let data = null;
+  for(let tiktokLiveConnectionData of tiktokLiveConnectionDatas){
+    if(tiktokLiveConnectionData.device.deviceName == deviceName){
+      data = tiktokLiveConnectionData;
+    }
+  }
+
+  try {
+    if(data.aiSetting){
+      await handleStreaming(data.tiktokLiveConnection, data.aiSetting.description, data.device.deviceName, io);
+    }
+    res.json({ deviceName });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -183,87 +205,11 @@ exports.deleteAudioFile = async (req, res) => {
   }
 };
 
-exports.readRandomChunk = async (req, res) => {
-  const { deviceName } = req.body;
-
-  try {
-    const device = await Device.findOne({ deviceName });
-    const aiSetting = await AISetting.findById(device.aiSetting);
-
-    const io = req.app.get('socketio');
-    await readRandomChunk(aiSetting.description, deviceName, io);
-
-    res.json({ message: 'Random chunk read successfully' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
-};
-
-exports.listenForEvents = async (req, res) => {
-  const { deviceName } = req.body;
-
-  try {
-    const io = req.app.get('socketio');
-    const tiktokLiveConnection = io.tiktokLiveConnections[deviceName];
-
-    tiktokLiveConnection.on('member', async (data) => {
-      const text = `${data.uniqueId} joins the stream!`;
-      const audioData = await generateAudio(text);
-      await saveAudioFile(deviceName, audioData);
-      io.emit('newAudioFile', { deviceName, newFile: audioData.fileName });
-    });
-
-    tiktokLiveConnection.on('roomUser', async (data) => {
-      const text = `Total viewers: ${data.viewerCount}`;
-      const audioData = await generateAudio(text);
-      await saveAudioFile(deviceName, audioData);
-      io.emit('newAudioFile', { deviceName, newFile: audioData.fileName });
-    });
-
-    res.json({ message: 'Listening for events' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
-};
-
 // Function to handle streaming with random selection
-const handleStreaming = async (description, deviceName, io) => {
-  const runRandomTask = async () => {
-    if (Math.random() < 0.5) {
-      await readRandomChunk(description, deviceName, io);
-    } else {
-      await listenForEvents(deviceName, io);
-    }
-  };
-
-  while (true) {
-    await runRandomTask();
-    await new Promise(resolve => setTimeout(resolve, 20000)); // Wait for 20 seconds before running the next task
-  }
-};
-
-// Mock function to generate audio from text
-const generateAudio = async (text) => {
-  const response = await axios.post('https://audio.api.speechify.com/generateAudioFiles', {
-    audioFormat: 'wav',
-    paragraphChunks: text,
-    voiceParams: {
-      name: 'sally',
-      engine: 'speechify',
-      languageCode: 'en-US',
-    },
-  });
-
-  return {
-    fileName: `${Date.now()}.mp3`,
-    audioStream: response.data.json.audioStream,
-  };
-};
-
-// Mock function to save audio file
-const saveAudioFile = async (deviceName, audioData) => {
-  const filePath = path.join(AUDIO_DIR, deviceName, audioData.fileName);
-  fs.writeFileSync(filePath, audioData.audioStream, { encoding: 'base64' });
+const handleStreaming = async (tiktokLiveConnection, description, deviceName, io) => {
+  // if (Math.random() < 0.5) {
+  //   await readRandomChunk(description, deviceName, io);
+  // } else {
+    await listenForEvents(tiktokLiveConnection, deviceName, io);
+  // }
 };

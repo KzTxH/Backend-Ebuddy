@@ -18,6 +18,13 @@ const connectToTikTokLive = (username) => {
         if (err.message.includes('user_not_found')) {
           console.error('User not found:', err);
           reject(new Error('TikTok user not found'));
+        } else if (err.message.includes('websocket upgrade') || err.message.includes('503')) {
+          console.error('TikTok does not offer a websocket upgrade:', err);
+          setTimeout(() => {
+            connectToTikTokLive(username)
+              .then(resolve)
+              .catch(reject);
+          }, 5000);
         } else {
           console.error('Error connecting to TikTok live stream:', err);
           reject(err);
@@ -27,7 +34,7 @@ const connectToTikTokLive = (username) => {
 };
 
 const readRandomChunk = async (description, deviceName, io) => {
-  const descriptionChunks = description.split('. ');
+  const descriptionChunks = description.split('\n');
   const randomIndex = Math.floor(Math.random() * descriptionChunks.length);
   const paragraphChunk = descriptionChunks[randomIndex];
 
@@ -38,7 +45,7 @@ const readRandomChunk = async (description, deviceName, io) => {
       'content-type': 'application/json',
     },
     data: JSON.stringify({
-      audioFormat: 'wav',
+      audioFormat: 'mp3',
       paragraphChunks: paragraphChunk,
       voiceParams: {
         name: 'sally',
@@ -52,26 +59,25 @@ const readRandomChunk = async (description, deviceName, io) => {
     const response = await axios('https://audio.api.speechify.com/generateAudioFiles', options);
     const audioStream = response.data.audioStream;
     const audioBuffer = Buffer.from(audioStream, 'base64');
-    const filePath = path.join(AUDIO_DIR, deviceName, `${Date.now()}.mp3`);
+    const fileName = Date.now();
+    const filePath = path.join(AUDIO_DIR, deviceName, fileName +`.mp3`);
 
     fs.writeFileSync(filePath, audioBuffer);
     console.log(`Audio file saved at ${filePath}`);
-    io.emit('newAudioFile', { deviceName, newFile: `${Date.now()}.mp3` });
+    io.emit('newAudioFile', { deviceName, newFile: fileName +`.mp3`});
   } catch (err) {
     console.error('Error generating or saving audio file:', err);
+    tiktokLiveConnection.on('member', listener);
+    return;
   }
 };
 
 const listenForEvents = (tiktokLiveConnection, deviceName, io) => {
-  const events = ['member', 'roomUser'];
+  console.log("here")
+  const listener = async (data) => {
+    tiktokLiveConnection.removeAllListeners('member', listener);
 
-  const listener = async (event, data) => {
-    let paragraphChunk = '';
-    if (event === 'member') {
-      paragraphChunk = `${data.uniqueId} joins the stream!`;
-    } else if (event === 'roomUser') {
-      paragraphChunk = `Current viewers: ${data.viewerCount}`;
-    }
+    let paragraphChunk = `${data.nickname} joins the stream!`;
 
     const options = {
       method: 'POST',
@@ -80,7 +86,7 @@ const listenForEvents = (tiktokLiveConnection, deviceName, io) => {
         'content-type': 'application/json',
       },
       data: JSON.stringify({
-        audioFormat: 'wav',
+        audioFormat: 'mp3',
         paragraphChunks: paragraphChunk,
         voiceParams: {
           name: 'sally',
@@ -94,25 +100,25 @@ const listenForEvents = (tiktokLiveConnection, deviceName, io) => {
       const response = await axios('https://audio.api.speechify.com/generateAudioFiles', options);
       const audioStream = response.data.audioStream;
       const audioBuffer = Buffer.from(audioStream, 'base64');
-      const filePath = path.join(AUDIO_DIR, deviceName, `${Date.now()}.mp3`);
+      const fileName = Date.now();
+      const filePath = path.join(AUDIO_DIR, deviceName, fileName + `.mp3`);
 
       fs.writeFileSync(filePath, audioBuffer);
       console.log(`Audio file saved at ${filePath}`);
-      io.emit('newAudioFile', { deviceName, newFile: `${Date.now()}.mp3` });
+      io.emit('newAudioFile', { deviceName, newFile: fileName + `.mp3` });
     } catch (err) {
       console.error('Error generating or saving audio file:', err);
+      tiktokLiveConnection.on('member', listener);
+      return;
     }
   };
 
-  events.forEach(event => {
-    tiktokLiveConnection.on(event, data => listener(event, data));
-  });
+  tiktokLiveConnection.on('member', listener);
 
-  setTimeout(() => {
-    events.forEach(event => {
-      tiktokLiveConnection.removeListener(event, data => listener(event, data));
-    });
-  }, 20000);
+  // setTimeout(() => {
+  //   tiktokLiveConnection.removeAllListeners('member', listener);
+  //   console.log("setTimeout")
+  // }, 15000);
 };
 
 module.exports = {
