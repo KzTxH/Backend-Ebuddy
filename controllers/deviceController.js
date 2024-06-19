@@ -2,16 +2,9 @@ const Device = require('../models/Device');
 const AISetting = require('../models/AISetting');
 const fs = require('fs');
 const path = require('path');
-const chokidar = require('chokidar');
-const { connectToTikTokLive, readRandomChunk, listenForEvents } = require('../services/tiktokliveAPI');
-const axios = require('axios');
+const { connectToTikTokLive, readRandomChunk, listenForEvents, shareEvent, followEvent } = require('../services/tiktokliveAPI');
 
 const AUDIO_DIR = path.join(__dirname, '../public/audio_files');
-
-// let tiktokLiveConnection = null;
-// let aiSetting = null;
-// let device = null;
-
 
 let tiktokLiveConnectionDatas = [];
 
@@ -42,21 +35,6 @@ exports.activateDevice = async (req, res) => {
     io.emit('updateActiveDevices', activeDevices);
 
     res.json(device);
-
-    // Watch for changes in the device's directory
-    // const deviceDir = path.join(AUDIO_DIR, deviceName);
-    // console.log(deviceDir)
-    // chokidar.watch(deviceDir).on('all', (event, filePath) => {
-    //   const newFile = path.basename(filePath);
-    //   if (event === 'add') {
-    //     io.emit('newAudioFile', { deviceName, newFile });
-    //   } else if (event === 'unlink') { // Handle file deletion
-    //     io.emit('deleteAudioFile', { deviceName, newFile });
-    //   }
-    //   // Emit updateAudioFiles for any change
-    //   const files = fs.readdirSync(deviceDir).filter(file => path.extname(file) === '.mp3');
-    //   io.emit('updateAudioFiles', { deviceName, files });
-    // });
 
   } catch (err) {
     console.error(err.message);
@@ -140,10 +118,18 @@ exports.linkAISettings = async (req, res) => {
 
       tiktokLiveConnectionData.tiktokLiveConnection = await connectToTikTokLive(tiktokLiveConnectionData.device.tiktokUsername);
 
-      // tiktokLiveConnection = await connectToTikTokLive(device.tiktokUsername);
-      // io.tiktokLiveConnections = io.tiktokLiveConnections || {};
-      // io.tiktokLiveConnections[deviceName] = tiktokLiveConnection;
       await handleStreaming(tiktokLiveConnectionData.tiktokLiveConnection, tiktokLiveConnectionData.aiSetting.description, tiktokLiveConnectionData.device.deviceName, io);
+
+      tiktokLiveConnectionData.tiktokLiveConnection.on('share', (data) => {
+
+        shareEvent(data, tiktokLiveConnectionData.device.deviceName, io);
+      })
+
+      tiktokLiveConnectionData.tiktokLiveConnection.on('follow', (data) => {
+
+        followEvent(data, tiktokLiveConnectionData.device.deviceName, io);
+      })
+
 
     } catch (error) {
       if (error.message.includes('TikTok user not found')) {
@@ -207,9 +193,9 @@ exports.deleteAudioFile = async (req, res) => {
 
 // Function to handle streaming with random selection
 const handleStreaming = async (tiktokLiveConnection, description, deviceName, io) => {
-  // if (Math.random() < 0.5) {
-  //   await readRandomChunk(description, deviceName, io);
-  // } else {
-    await listenForEvents(tiktokLiveConnection, deviceName, io);
-  // }
+  if (Math.random() < 0.5) {
+    await readRandomChunk(description, deviceName, io);
+  } else {
+    await listenForEvents(tiktokLiveConnection, description, deviceName, io);
+  }
 };

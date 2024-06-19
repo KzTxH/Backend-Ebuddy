@@ -25,4 +25,6 @@ router.post('/link-ai-settings', auth, deviceController.linkAISettings);
 
 router.post('/voice-ai', auth, deviceController.voiceAI);
 
+router.delete('/audio/:deviceName/:fileName', auth, deviceController.deleteAudioFile);
+
 module.exports = router;

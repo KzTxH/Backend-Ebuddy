@@ -6,7 +6,10 @@ const fs = require('fs');
 const http = require('http');
 const socketIo = require('socket.io');
 const connectDB = require('./config/db');
-const chokidar = require('chokidar');
+const authRoutes = require('./router/authRoutes');
+const phoneRoutes = require('./router/phoneRoutes');
+const aiSettingsRoutes = require('./router/aiSettingsRoutes');
+
 require('dotenv').config();
 
 const app = express();
@@ -20,35 +23,10 @@ app.use(cors());
 app.use(helmet());
 
 // Serve static files
-app.use('/audio', express.static(path.join(__dirname, 'public/audio_files')));
 
 const AUDIO_DIR = path.join(__dirname, 'public', 'audio_files');
 
-// const getAudioFiles = (deviceName) => {
-//   if (!deviceName) {
-//     console.error('Device name is undefined');
-//     return [];
-//   }
-//   const deviceDir = path.join(AUDIO_DIR, deviceName);
-//   if (!fs.existsSync(deviceDir)) {
-//     console.error(`Directory for device ${deviceName} does not exist`);
-//     return [];
-//   }
-//   if (!fs.lstatSync(deviceDir).isDirectory()) {
-//     console.error(`${deviceDir} is not a directory`);
-//     return [];
-//   }
-//   return fs.readdirSync(deviceDir)
-//     .filter(file => path.extname(file) === '.mp3')
-//     .sort((a, b) => a.localeCompare(b));
-// };
-
-// Define routes
-// Define routes
-const authRoutes = require('./router/authRoutes');
-const phoneRoutes = require('./router/phoneRoutes');
-const aiSettingsRoutes = require('./router/aiSettingsRoutes');
-
+app.use('/audio', express.static(path.join(__dirname, 'public/audio_files')));
 app.use('/api/auth', authRoutes);
 app.use('/api/phone', phoneRoutes);
 app.use('/api/ai-settings', aiSettingsRoutes);
@@ -79,16 +57,6 @@ app.set('socketio', io);
 
 io.on('connection', (socket) => {
   console.log('Client connected');
-
-  // socket.on('getAudioFiles', (deviceName) => {
-  //   if (!deviceName) {
-  //     console.error('Device name is undefined');
-  //     return;
-  //   }
-  //   const files = getAudioFiles(deviceName);
-  //   socket.emit('audioFiles', files);
-  // });
-
   socket.on('disconnect', () => {
     console.log('Socket disconnected');
   });
