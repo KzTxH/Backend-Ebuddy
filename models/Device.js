@@ -14,6 +14,10 @@ const DeviceSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
   aiSetting: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AISetting'

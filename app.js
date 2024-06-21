@@ -9,6 +9,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./router/authRoutes');
 const phoneRoutes = require('./router/phoneRoutes');
 const aiSettingsRoutes = require('./router/aiSettingsRoutes');
+const Device = require('./models/Device');
 
 require('dotenv').config();
 
@@ -54,10 +55,32 @@ const io = socketIo(server, {
 
 app.set('socketio', io);
 
+const clients = new Map();
 
 io.on('connection', (socket) => {
-  console.log('Client connected');
-  socket.on('disconnect', () => {
+
+  socket.on('registerDevice', async (id, deviceName) => {
+    clients.set(socket.id, { id: id, deviceName: deviceName});
+    console.log(clients);
+    let device = await Device.findOne({ deviceName });
+    device.isOnline = true;
+    await device.save();
+    io.emit('updateActiveDevices');
+  });
+
+  socket.on('disconnect', async () => {
+    const clientInfo = clients.get(socket.id);
+    if (clientInfo) {
+      console.log(`User disconnected: ${clientInfo.deviceName} (${socket.id})`);
+      let deviceName = clientInfo.deviceName;
+      let device = await Device.findOne({ deviceName });
+      device.isOnline = false;
+      await device.save();
+      clients.delete(socket.id);
+      io.emit('updateActiveDevices');
+
+      console.log(clients);
+    }
     console.log('Socket disconnected');
   });
 
