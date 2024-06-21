@@ -51,7 +51,7 @@ const readRandomChunk = async (description, deviceName, io) => {
       audioFormat: 'mp3',
       paragraphChunks: [descriptionChunk],
       voiceParams: {
-        name:  `sally`,//VOICE_NAME[Math.floor(Math.random() * VOICE_NAME.length)], 
+        name:  `sally`, //VOICE_NAME[Math.floor(Math.random() * VOICE_NAME.length)], 
         engine: 'speechify',
         languageCode: 'en-US',
       },
