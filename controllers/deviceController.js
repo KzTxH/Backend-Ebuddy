@@ -3,8 +3,11 @@ const AISetting = require('../models/AISetting');
 const fs = require('fs');
 const fsex = require('fs-extra');
 const path = require('path');
-const rimraf = require('rimraf');
-const { connectToTikTokLive, readRandomChunk, listenForEvents, shareEvent, followEvent, likeEvent } = require('../services/tiktokliveAPI');
+const { connectToTikTokLive, readRandomChunk, listenForEvents, sayHelloToEveryone, shareEvent, followEvent, likeEvent } = require('../services/tiktokliveAPI');
+
+
+const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath('C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe');
 
 const AUDIO_DIR = path.join(__dirname, '../public/audio_files');
 
@@ -13,10 +16,9 @@ let tiktokLiveConnectionDatas = [];
 
 // Activate a device
 exports.activateDevice = async (req, res) => {
-  const { deviceName, tiktokUsername, aiSettingId} = req.body;  // làm sau nếu deviceName đang được active thì không cho phép
+  const { deviceName, tiktokUsername, aiSettingId, selectedVoiceSetting} = req.body;  // làm sau nếu deviceName đang được active thì không cho phép
 
   let device;
-
   try {
 
     let aiSetting = await AISetting.findById(aiSettingId);
@@ -25,12 +27,14 @@ exports.activateDevice = async (req, res) => {
     } else{
       device = await Device.findOne({ deviceName });
       if (!device) {
-        device = new Device({ deviceName, tiktokUsername, isActive: true, aiSettingId });
+        device = new Device({ deviceName, tiktokUsername, isActive: true, aiSettingId, selectedVoiceSetting});
         await device.save();
       } else {
         device.tiktokUsername = tiktokUsername;
         device.isActive = true;
         device.aiSetting = aiSettingId;
+        device.aiSetting = aiSettingId;
+        device.voiceSetting = selectedVoiceSetting;
         await device.save();
       }
     }
@@ -58,13 +62,13 @@ const connectTIKTOK = async (res, tiktokUsername, aiSetting, device, io) => {
     let tiktokConnection = await connectToTikTokLive(tiktokUsername);
     
     tiktokConnection.on('share', (data) => {
-      shareEvent(data, device.deviceName, io);
+      shareEvent(data, device, io);
     })
     tiktokConnection.on('follow', (data) => {
-      followEvent(data, device.deviceName, io);
+      followEvent(data, device, io);
     })
     tiktokConnection.on('like', (data) => {
-      likeEvent(data, device.deviceName, io);
+      likeEvent(data, device, io);
     })
 
     tiktokLiveConnectionDatas.push({
@@ -128,17 +132,17 @@ exports.deactivateDevice = async (req, res) => {
         
         tiktokLiveConnectionDatas[i].tiktokLiveConnection.removeAllListeners('share', (data) => {
 
-          shareEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device.deviceName, io);
+          shareEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device, io);
         });
 
         tiktokLiveConnectionDatas[i].tiktokLiveConnection.removeAllListeners('follow', (data) => {
 
-          followEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device.deviceName, io);
+          followEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device, io);
         });
 
         tiktokLiveConnectionDatas[i].tiktokLiveConnection.removeAllListeners('like', (data) => {
 
-          likeEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device.deviceName, io);
+          likeEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device, io);
         });
 
 
@@ -179,7 +183,7 @@ exports.voiceAI = async (req, res) => {
 
   try {
     if(data.aiSetting){
-      await handleStreaming(data.tiktokLiveConnection, data.aiSetting.description, data.device.deviceName, io);
+      await handleStreaming(data.tiktokLiveConnection, data.aiSetting, data.device, io);
     }
     res.json({ deviceName });
   } catch (err) {
@@ -211,14 +215,16 @@ exports.deleteAudioFile = async (req, res) => {
         res.status(200).json({ message: 'File deleted successfully' });
       });
     });
-    
 };
 
 // Function to handle streaming with random selection
-const handleStreaming = async (tiktokLiveConnection, description, deviceName, io) => {
-  if (Math.random() < 0.28) {
-    await readRandomChunk(description, deviceName, io);
+const handleStreaming = async (tiktokLiveConnection, aiSetting, device, io) => {
+  let rand = Math.random();
+  if (rand > 0 && rand <= 0.25) {
+    await readRandomChunk(aiSetting, device, io);
+  } else if (rand > 0.25 && rand <= 0.35) {
+    await sayHelloToEveryone(tiktokLiveConnection, aiSetting, device, io);
   } else {
-    await listenForEvents(tiktokLiveConnection, description, deviceName, io);
+    await listenForEvents(tiktokLiveConnection, aiSetting, device, io);
   }
 };

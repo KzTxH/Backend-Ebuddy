@@ -21,6 +21,10 @@ const DeviceSchema = new mongoose.Schema({
   aiSetting: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AISetting'
+  },
+  voiceSetting: {
+    type: String,
+    required: true
   }
 });
 
