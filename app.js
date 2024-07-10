@@ -9,6 +9,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./router/authRoutes');
 const phoneRoutes = require('./router/phoneRoutes');
 const aiSettingsRoutes = require('./router/aiSettingsRoutes');
+const producttypeSettingsRoutes = require('./router/producttypeSettingsRoutes');
 const Device = require('./models/Device');
 
 require('dotenv').config();
@@ -21,6 +22,7 @@ connectDB();
 // Init Middleware
 app.use(express.json());
 app.use(cors());
+app.options('*', cors());
 app.use(helmet());
 
 // Serve static files
@@ -31,6 +33,7 @@ app.use('/audio', express.static(path.join(__dirname, 'public/audio_files')));
 app.use('/api/auth', authRoutes);
 app.use('/api/phone', phoneRoutes);
 app.use('/api/ai-settings', aiSettingsRoutes);
+app.use('/api/producttype-settings', producttypeSettingsRoutes);
 
 app.get('/audio/:deviceName/:filename', (req, res) => {
   const { deviceName, filename } = req.params;

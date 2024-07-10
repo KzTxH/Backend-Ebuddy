@@ -17,7 +17,6 @@ let tiktokLiveConnectionDatas = [];
 // Activate a device
 exports.activateDevice = async (req, res) => {
   const { deviceName, tiktokUsername, aiSettingId, selectedVoiceSetting} = req.body;  // làm sau nếu deviceName đang được active thì không cho phép
-
   let device;
   try {
 
@@ -74,9 +73,17 @@ const connectTIKTOK = async (res, tiktokUsername, aiSetting, device, io) => {
     tiktokLiveConnectionDatas.push({
       "tiktokLiveConnection": tiktokConnection,
       "aiSetting": aiSetting,
-      "device": device
+      "device": device,
+      "isfisrt": true
     });
 
+    setTimeout(()=> {
+      for (let i = 0; i < tiktokLiveConnectionDatas.length; i++) {
+        if(tiktokLiveConnectionDatas[i].device.deviceName == device.deviceName){
+          tiktokLiveConnectionDatas[i].isfisrt = false;
+        }
+      }
+    }, 300000)
 
 
     res.send("Kết Nối Thành Công");
@@ -131,17 +138,14 @@ exports.deactivateDevice = async (req, res) => {
       if (tiktokLiveConnectionDatas[i].device.deviceName === deviceName) {
         
         tiktokLiveConnectionDatas[i].tiktokLiveConnection.removeAllListeners('share', (data) => {
-
           shareEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device, io);
         });
 
         tiktokLiveConnectionDatas[i].tiktokLiveConnection.removeAllListeners('follow', (data) => {
-
           followEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device, io);
         });
 
         tiktokLiveConnectionDatas[i].tiktokLiveConnection.removeAllListeners('like', (data) => {
-
           likeEvent(data, tiktokLiveConnectionDatas[i].tiktokLiveConnection.device, io);
         });
 
@@ -175,14 +179,21 @@ exports.voiceAI = async (req, res) => {
   const io = req.app.get('socketio');
   let data = null;
   for(let tiktokLiveConnectionData of tiktokLiveConnectionDatas){
-    
     if(tiktokLiveConnectionData.device.deviceName == deviceName){
       data = tiktokLiveConnectionData;
     }
   }
 
   try {
-    if(data.aiSetting){
+    console.log("data.isfisrt");
+    console.log(data.isfisrt);
+    if(data.isfisrt){
+      if (Math.random() <= 0.5) {
+        await listenForEvents(data.tiktokLiveConnection, data.aiSetting, data.device, io);
+      } else{
+        await sayHelloToEveryone(data.tiktokLiveConnection, data.aiSetting, data.device, io);
+      }
+    } else {
       await handleStreaming(data.tiktokLiveConnection, data.aiSetting, data.device, io);
     }
     res.json({ deviceName });
@@ -205,7 +216,7 @@ exports.deleteAudioFile = async (req, res) => {
         // Lỗi khác
         return res.status(500).json({ message: 'Error checking file', error: err.message });
       }
-  
+      
       // Xóa file nếu tồn tại
       fs.unlink(filePath, (err) => {
         if (err) {
@@ -220,9 +231,9 @@ exports.deleteAudioFile = async (req, res) => {
 // Function to handle streaming with random selection
 const handleStreaming = async (tiktokLiveConnection, aiSetting, device, io) => {
   let rand = Math.random();
-  if (rand > 0 && rand <= 0.25) {
+  if (rand > 0 && rand <= 0.5) {
     await readRandomChunk(aiSetting, device, io);
-  } else if (rand > 0.25 && rand <= 0.35) {
+  } else if (rand > 0.5 && rand <= 0.65) {
     await sayHelloToEveryone(tiktokLiveConnection, aiSetting, device, io);
   } else {
     await listenForEvents(tiktokLiveConnection, aiSetting, device, io);
